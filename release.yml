@@ -1,0 +1,91 @@
+name: Build desktop apps
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    name: Windows 10/11 EXE
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install PyInstaller
+        run: python -m pip install --upgrade pyinstaller
+      - name: Build EXE
+        run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name WinterDesktop winter.pyw
+      - name: Upload EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: Windows-x64
+          path: dist/WinterDesktop.exe
+          if-no-files-found: error
+
+  macos:
+    name: macOS ${{ matrix.arch }} APP
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-15
+          - arch: x86_64
+            runner: macos-15-intel
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install 'PySide6>=6.7,<7' 'pyobjc-framework-Cocoa>=10' 'pyobjc-framework-Quartz>=10' pyinstaller
+      - name: Build macOS app
+        run: |
+          python -m PyInstaller --noconfirm --clean --windowed \
+            --name 'Winter Desktop' \
+            --osx-bundle-identifier com.kendrr.winterdesktop \
+            --collect-all PySide6 \
+            --hidden-import Quartz --hidden-import AppKit --hidden-import objc \
+            winter_mac.py
+      - name: Package app
+        run: ditto -c -k --sequesterRsrc --keepParent 'dist/Winter Desktop.app' 'dist/WinterDesktop_macOS_${{ matrix.arch }}.zip'
+      - name: Upload app
+        uses: actions/upload-artifact@v4
+        with:
+          name: macOS-${{ matrix.arch }}
+          path: dist/WinterDesktop_macOS_${{ matrix.arch }}.zip
+          if-no-files-found: error
+
+  publish:
+    name: Publish GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [windows, macos]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+      - name: Publish release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            release-assets/WinterDesktop.exe
+            release-assets/WinterDesktop_macOS_arm64.zip
+            release-assets/WinterDesktop_macOS_x86_64.zip
