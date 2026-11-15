@@ -1,0 +1,39 @@
+name: Build Executables
+
+on:
+  push:
+    tags:
+      - 'v*' # Автоматический запуск сборки при создании нового тега (например, v1.0.1)
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11' # Укажи свою рабочую версию Python
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pyinstaller PySide6
+        # Если у тебя есть requirements.txt с другими модулями, раскомментируй строку ниже:
+        # pip install -r requirements.txt
+
+    - name: Build executable with PyInstaller
+      run: |
+        pyinstaller --windowed --onefile --hidden-import PySide6 winter.pyw
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: Winter-Desktop-${{ matrix.os }}
+        path: dist/
