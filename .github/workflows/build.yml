@@ -30,7 +30,7 @@ jobs:
 
     - name: Build executable with PyInstaller
       run: |
-        pyinstaller --windowed --onefile --hidden-import PySide6 winter.pyw
+        pyinstaller --windowed --onefile --collect-all PySide6 winter.pyw
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
